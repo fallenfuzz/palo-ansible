@@ -1,0 +1,26 @@
+---
+- name: Clone Your remote repo to the local station
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - include: tasks/clone_your_remote_repo.yml
+
+- name: Export and save localy PA config
+  hosts: pa_config_upload
+  gather_facts: False
+  connection: local
+  vars:
+    ansible_python_interpreter: "/usr/local/bin/python3"
+  vars_files:
+    - vars/firewall_secrets.yml
+  tasks:
+    - include: tasks/pa-export-full-device-config.yml
+
+
+- name: Upload to git saved configs if there are diffs
+  hosts: localhost
+  gather_facts: False
+  connection: local
+  tasks:
+    - include: tasks/upload-exported-config-to-git.yml

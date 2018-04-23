@@ -1,0 +1,24 @@
+- name: Check Your remote repo for diffs with local folder
+  shell: git status
+  args:
+    chdir: files/backups
+  register: status_result
+
+
+- name: git add
+  shell: git add -A
+  args:
+    chdir: files/backups
+  when: status_result.stdout.find('nothing to commit') == -1
+
+- name: git commit
+  shell: git commit -m "Update FW config files"
+  args:
+    chdir: files/backups
+  when: status_result.stdout.find('nothing to commit') == -1
+
+- name: git push
+  shell: git push
+  args:
+    chdir: files/backups
+  when: status_result.stdout.find('nothing to commit') == -1
