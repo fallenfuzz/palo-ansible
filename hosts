@@ -1,5 +1,9 @@
-[pa_config_upload]
-fw1
-fw2
-fw3
-fw4
+---
+all:
+  children:
+    pa_config_upload:   ### List of the firewalls to backup their config
+      hosts:
+        fw1:
+        fw2:
+        fw3:
+        fw4:

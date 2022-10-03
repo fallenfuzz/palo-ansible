@@ -1,26 +1,76 @@
 ---
-- name: Clone Your remote repo to the local station
+- name: Clone fw-backup repo to the local station
   hosts: localhost
-  gather_facts: False
-  connection: local
-  tasks:
-    - include: tasks/clone_your_remote_repo.yml
 
-- name: Export and save localy PA config
+  tasks:
+    - name: Clone fw-backup repo
+      git:
+        repo: 'https://github.com/some-one/fw-backup.git'
+        dest: files/fw-backup/
+        force: true
+
+- name: Export and save localy Palo Alto config
   hosts: pa_config_upload
-  gather_facts: False
-  connection: local
-  vars:
-    ansible_python_interpreter: "/usr/local/bin/python3"
   vars_files:
     - vars/firewall_secrets.yml
   tasks:
-    - include: tasks/pa-export-full-device-config.yml
+    - name: "BLOCK >> Get and Parse Palo Alto config"
+      block:
+        - name: Get palo alto device api key
+          uri:
+            url: "https://{{ inventory_hostname }}/api/?type=keygen&user={{ username }}&password={{ password }}"
+            method: GET
+            validate_certs: false
+            body_format: json
+            return_content: true
+            timeout: 300
+          register: result
 
+        - name: Get palo alto device config
+          uri:
+            url: "https://{{ inventory_hostname }}/api/?type=export&category=configuration&key={{ result.content | regex_findall('^.*<key>(.*)<\\/key>') | first}}"
+            method: GET
+            validate_certs: false
+            return_content: true
+            timeout: 300
+          register: pa_config
+
+        - name: Parse the config in xml and save it in a readable output
+          xml:
+            xmlstring: " {{ pa_config.content }} "
+            xpath: //config
+            content: 'text'
+            pretty_print: true
+          register: xml_output
+
+        - name: Save parsed config localy on the device
+          local_action: copy content={{ xml_output.xmlstring }} dest=files/fw-backup/{{ inventory_hostname }}.xml
+      delegate_to: localhost
 
 - name: Upload to git saved configs if there are diffs
   hosts: localhost
-  gather_facts: False
-  connection: local
+
   tasks:
-    - include: tasks/upload-exported-config-to-git.yml
+    - name: Check fw-backup repo for diffs with local folder
+      shell: git status
+      args:
+        chdir: files/fw-backup
+      register: status_result
+
+    - name: git add
+      shell: git add -A
+      args:
+        chdir: files/fw-backup 
+      when: status_result.stdout.find('nothing to commit') == -1
+
+    - name: git commit
+      shell: git commit -m "Update FW config files"
+      args:
+        chdir: files/fw-backup
+      when: status_result.stdout.find('nothing to commit') == -1
+
+    - name: git push
+      shell: git push
+      args:
+        chdir: files/fw-backup
+      when: status_result.stdout.find('nothing to commit') == -1

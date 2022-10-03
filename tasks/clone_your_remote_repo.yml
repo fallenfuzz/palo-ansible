@@ -1,5 +1,0 @@
-- name: Clone Your remote repo
-  git:
-    repo: 'Your-remote-repo-URL'
-    dest: files/backups/
-    force: yes
